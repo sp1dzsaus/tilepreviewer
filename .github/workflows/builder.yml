@@ -9,11 +9,8 @@ jobs:
           - name: Install the dependencies
             run: pip3 install pyinstaller
           - name: Build the executable
-            run: pyinstaller --windowed main.py
-          - uses: actions/download-artifact@v2
-              with:
-                path: dist/
-    
-          - name: Display structure of downloaded files
-            run: ls -R
-            working-directory: dist/
+            run: pyinstaller --windowed main.py --onefile
+          - uses: actions/upload-artifact@v2
+            with: 
+                name: build-windows
+                path: dist/main.exe
