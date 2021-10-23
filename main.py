@@ -72,18 +72,16 @@ class TileList(QWidget):
                 for x in range(self.listwidget.count())]
 
 
-class PatchworkView(QWidget):
+class PatchworkView(QFrame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.active = False
         self.scale = 1
         self.shift = QPoint(0, 0)
         self._drag_point = False
-        self.frame = QFrame(self)
-        self.frame.setFrameRect(self.geometry())
-        self.frame.setFrameStyle(QFrame.Box | QFrame.Sunken)
-        self.frame.setLineWidth(2)
-        self.frame.setMidLineWidth(1)
+        self.setFrameStyle(QFrame.Box | QFrame.Sunken)
+        self.setLineWidth(2)
+        self.setMidLineWidth(1)
 
     #TODO: Actions
     
@@ -101,7 +99,6 @@ class PatchworkView(QWidget):
 
     def resize(self, *args, **kwargs):
         super().resize(*args, **kwargs)
-        self.frame.resize(*args, **kwargs)
 
     def open(self, patchwork: Patchwork):
         self.active = True
@@ -120,6 +117,7 @@ class PatchworkView(QWidget):
         if self.active:
             painter = QPainter(self)
             painter.drawImage(self.get_rect(), self.image)
+        super().paintEvent(e)
 
     def get_rect(self):
         return QRectF(self.scale * (self.shift.x()),
@@ -154,7 +152,7 @@ class PatchworkView(QWidget):
             subprocess.Popen(fr'explorer /select,"{path}"')
         _file_location()
 
-class Window(QWidget):
+class Window(QMainWindow):
     def __init__(self):
         super().__init__()
         self.initUI()
@@ -164,25 +162,28 @@ class Window(QWidget):
         self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt1.png'))
         self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt2.png'))
         self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt3.png'))
-        self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt4.png'))
-        self.start()        
+        self.start()
 
     def initUI(self):
         self.setGeometry(100, 100, 1510, 1000)
         self.setWindowTitle('TilePreviewer')
-        self.patchworkview = PatchworkView(self)
-        self.patchworkview.move(450, 55)
-        self.patchworkview.resize(1000, 900)
-
-        self.tilelist = TileList(self)
-        self.tilelist.move(55, 55)
-        self.tilelist.resize(300, 400)
-
-        self.start_button = QPushButton('Сгенерировать', self)
-        self.start_button.move(55, 700)
-        self.start_button.resize(200, 100)
-        self.start_button.clicked.connect(self.start)
         
+        self.central = QWidget(self)
+
+        self.tilelist = TileList(self.central)
+
+        self.start_button = QPushButton('Сгенерировать', self.central)
+        self.start_button.clicked.connect(self.start)
+
+        self.patchworkview = PatchworkView(self.central)
+        #self.patchworkview.resize(1000, 900)
+
+        self.layout = QGridLayout(self.central)
+        self.layout.addWidget(self.patchworkview, 0, 1, 3, 3)
+        self.layout.addWidget(self.tilelist, 0, 0, Qt.AlignLeft)
+        self.layout.addWidget(self.start_button, 1, 0, Qt.AlignBottom)
+        self.setCentralWidget(self.central)
+
 
     def start(self):
         try:
