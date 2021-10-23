@@ -2,7 +2,7 @@ from PyQt5.QtGui import QPainter, QColor, QFont, QPixmap, QMouseEvent, QWheelEve
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, QRectF, QPoint, QPointF, QSize
 import sys
-from patchwork import Patchwork
+from patchwork import Patchwork, InvalidTileData
 import subprocess
 
 def open_image(path):
@@ -158,11 +158,13 @@ class Window(QWidget):
     def __init__(self):
         super().__init__()
         self.initUI()
+        self.demo()
 
     def demo(self):
         self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt1.png'))
         self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt2.png'))
-        self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt3.png'))        
+        self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt3.png'))
+        self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt4.png'))
         self.start()        
 
     def initUI(self):
@@ -183,13 +185,24 @@ class Window(QWidget):
         
 
     def start(self):
-        data = self.tilelist.getData()
-        patchwork = Patchwork(*self.tilelist.getData())
-        self.patchworkview.open(patchwork)
+        try:
+            data = self.tilelist.getData()
+            patchwork = Patchwork(*self.tilelist.getData())
+            self.patchworkview.open(patchwork)
+        except InvalidTileData as ex:
+            error = QMessageBox(self)
+            error.setText('Ошибка: ' + str(ex))
+            error.setWindowTitle('Ошибка')
+            error.open()
+        except NotImplementedError as ex:
+            error = QMessageBox(self)
+            error.setText('Эта функция не доступна в данной версии приложения.')
+            error.setWindowTitle('Ошибка')
+            error.open()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     ex = Window()
     ex.show()
     sys.exit(app.exec())
-    
+

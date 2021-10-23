@@ -3,7 +3,11 @@ class InvalidTileData(Exception):
 
 class Patchwork:
     def __init__(self, *images):
+        if not images:
+            raise InvalidTileData('No tiles given.')
         self.map = Patchwork._gen(len(images))
+        if self.map is NotImplemented:
+            raise NotImplementedError
         if len(set([(image.width(),
                      image.height()) for image in images])) != 1:
             raise InvalidTileData('Tile sizes must be identical.')
