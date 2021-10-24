@@ -1,4 +1,4 @@
-from PyQt5.QtGui import QPainter, QColor, QFont, QPixmap, QMouseEvent, QWheelEvent, QImage, QIcon
+from PyQt5.QtGui import QPainter, QColor, QFont, QPixmap, QMouseEvent, QWheelEvent, QImage, QIcon, QClipboard
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt, QRectF, QPoint, QPointF, QSize
 import sys
@@ -106,8 +106,7 @@ class PatchworkView(QFrame):
         self.image = QPixmap(patchwork.pixel_width(),
                         patchwork.pixel_height())
         patchwork.draw(QPainter(self.image))
-        pixmap = QPixmap(self.image)
-        self.image = pixmap.toImage()
+        self.image = self.image.toImage()
         self._imw = self.image.width()
         self._imh = self.image.height()
         self.fit()
@@ -150,7 +149,18 @@ class PatchworkView(QFrame):
         def _file_location():
             path = selected._path.replace("/", "\\")
             subprocess.Popen(fr'explorer /select,"{path}"')
-        _file_location()
+        def _copy():
+            QApplication.clipboard().setImage(self.image)
+        menu = QMenu(self)
+        action1 = QAction('Копировать')
+        action1.triggered.connect(_copy)
+        menu.addAction(action1)
+        action2 = QAction('Перейти к расположению тайла')
+        action2.triggered.connect(_file_location)
+        if not self.get_rect().contains(event.pos()):
+            action2.setDisabled(True)
+        menu.addAction(action2)
+        menu.exec(event.globalPos())
 
 class Window(QMainWindow):
     def __init__(self):
@@ -159,9 +169,9 @@ class Window(QMainWindow):
         self.demo()
 
     def demo(self):
-        self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt1.png'))
-        self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt2.png'))
-        self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt3.png'))
+        self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt/dirt1.png'))
+        self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt/dirt2.png'))
+        self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt/dirt3.png'))
         self.start()
 
     def initUI(self):
@@ -176,12 +186,12 @@ class Window(QMainWindow):
         self.start_button.clicked.connect(self.start)
 
         self.patchworkview = PatchworkView(self.central)
-        #self.patchworkview.resize(1000, 900)
+        self.patchworkview.resize(1000, 900)
 
         self.layout = QGridLayout(self.central)
         self.layout.addWidget(self.patchworkview, 0, 1, 3, 3)
         self.layout.addWidget(self.tilelist, 0, 0, Qt.AlignLeft)
-        self.layout.addWidget(self.start_button, 1, 0, Qt.AlignBottom)
+        self.layout.addWidget(self.start_button, 1, 0, 1, 1, Qt.AlignBottom)
         self.setCentralWidget(self.central)
 
 
