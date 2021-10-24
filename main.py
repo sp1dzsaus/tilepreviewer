@@ -71,6 +71,15 @@ class TileList(QWidget):
         return [self.listwidget.item(x).__data
                 for x in range(self.listwidget.count())]
 
+class SlicerProductList(TileList):
+    def __init__(self, slicer, *args, **kwargs):
+        self.slicer = slicer
+        super().__init__(*args, **kwargs)
+    
+    def openTileSelection(self):
+        if self.slicer.isAnythingSelected():
+            self.addTile(self.slicer.selectedArea())
+        self.slicer.retireSelection()
 
 class ImageView(QFrame):
     def __init__(self, *args, **kwargs):
@@ -108,11 +117,17 @@ class ImageView(QFrame):
             painter.drawImage(self.get_rect(), self.image)
         super().paintEvent(e)
 
+    def convertRect(self, rect):
+        return QRectF(self.scale * (rect.x() + self.shift.x()),
+                      self.scale * (rect.y() + self.shift.y()),
+                      self.scale * rect.width(),
+                      self.scale * rect.height())
+    
     def get_rect(self):
-        return QRectF(self.scale * (self.shift.x()),
-                      self.scale * (self.shift.y()),
-                      self.scale * self._imw,
-                      self.scale * self._imh)
+        return self.convertRect(QRectF(0,
+                                       0,
+                                       self._imw,
+                                       self._imh))
 
     def mousePressEvent(self, event: QMouseEvent):
         self._drag_point = event.pos() / self.scale       
@@ -183,50 +198,83 @@ class TilemapSlicerView(ImageView):
         self.selection = QRect(0, 0, 0, 0)
         self._select_point = False
         self.shift = QPoint(5, 5)
+        self.gray_areas = []
+
+    def retireSelection(self):
+        self.gray_areas.append(self.selection)
+        self.selection = QRect(0, 0, 0, 0)
+        self.repaint()
 
     def x_clamp(self, x):
         rect = self.get_rect()
-        return min(rect.width() + rect.x(), max(rect.x(), x))
+        return min(rect.width() + rect.x() + 1, max(rect.x(), x))
 
     def y_clamp(self, y):
         rect = self.get_rect()
-        return min(rect.height() + rect.y(), max(rect.y(), y))
+        return min(rect.height() + rect.y() + 1, max(rect.y(), y))
     
     def mousePressEvent(self, event: QMouseEvent):
+        if bool(event.modifiers() & Qt.ShiftModifier):
+            super().mousePressEvent(event)
+            return
         self.selection = QRect(0, 0, 0, 0)
-        self._select_point = QPointF(self.x_clamp(round(event.x())) / self.scale,
-                                     self.y_clamp(round(event.y())) / self.scale)
+        pos = event.pos()
+        self._select_point = QPointF(self.x_clamp(int(pos.x())) / self.scale - self.shift.x(),
+                                     self.y_clamp(int(pos.y())) / self.scale - self.shift.y())
         self.selection.setX(self._select_point.x())
         self.selection.setY(self._select_point.y())
 
     def mouseReleaseEvent(self, event: QMouseEvent):
+        if bool(event.modifiers() & Qt.ShiftModifier):
+            super().mouseReleaseEvent(event)
+            return
         self._select_point = False
 
     def mouseMoveEvent(self, event: QMouseEvent):
+        if bool(event.modifiers() & Qt.ShiftModifier):
+            super().mouseMoveEvent(event)
+            return        
         if self._select_point:
-            pos = QPointF(self.x_clamp(round(event.x())) / self.scale,
-                          self.y_clamp(round(event.y())) / self.scale)
-            delta = (pos - self._select_point)
+            pos = event.pos()
+            pos.setX(pos.x() + self.scale)
+            pos.setY(pos.y() + self.scale)
+            pos = QPointF(self.x_clamp(int(pos.x())) / self.scale - self.shift.x(),
+                          self.y_clamp(int(pos.y())) / self.scale - self.shift.y())
+            delta = (pos - self._select_point) 
             self.selection.setSize(QSize(delta.x(), delta.y()))
             self.repaint()
 
     def get_selection_rect(self):
-        return QRectF(self.selection.x() * self.scale,
-                      self.selection.y() * self.scale,
-                      self.selection.width() * self.scale,
-                      self.selection.height() * self.scale)
+        return self.convertRect(self.selection)
 
     def isSelectionSquare(self):
         return abs(self.selection.width()) == abs(self.selection.height())
+
+    def isAnythingSelected(self):
+        return self.selection.width() != 0 and self.selection.height() != 0
+
+    def selectedArea(self):
+        rect = QRect(self.selection.x(),
+                     self.selection.y(),
+                     self.selection.width(),
+                     self.selection.height())
+        if rect.width() < 0:
+            rect.translate(rect.width(), 0)
+            rect.setWidth(abs(rect.width()))
+        if rect.height() < 0:
+            rect.translate(0, rect.height())
+            rect.setHeight(abs(rect.height()))
+        cropped = self.image.copy(rect)
+        cropped._path = self.image._path
+        return cropped
     
     def paintEvent(self, e):
         super().paintEvent(e)
         painter = QPainter(self)
-        try:
-            painter.setPen(QPen(Qt.green if self.isSelectionSquare() else Qt.blue, 
-                                3, Qt.DashDotLine, Qt.RoundCap, Qt.RoundJoin))
-        except Exception as e:
-            print(e)
+        painter.setPen(QPen(Qt.green if self.isSelectionSquare() else Qt.blue,
+                            3, Qt.DashDotLine, Qt.RoundCap, Qt.RoundJoin))
+        for area in self.gray_areas:
+            painter.fillRect(self.convertRect(area), QColor(150, 150, 150, 150))
         painter.drawRect(self.get_selection_rect())
 
 class TilemapSlicerDialog(QDialog):
@@ -246,8 +294,11 @@ class TilemapSlicerDialog(QDialog):
         self.slicer = TilemapSlicerView(self)
         self.slicer.resize(size / 1.25)
         self.slicer.open(self.image)
+        self.tilelist = SlicerProductList(self.slicer, self)
         self.layout = QGridLayout(self)
         self.layout.addWidget(self.slicer, 0, 0, 3, 3)
+        self.layout.addWidget(self.tilelist, 0, 4, Qt.AlignLeft)
+        
 
 
 
