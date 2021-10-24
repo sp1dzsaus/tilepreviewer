@@ -72,7 +72,7 @@ class TileList(QWidget):
                 for x in range(self.listwidget.count())]
 
 
-class PatchworkView(QFrame):
+class ImageView(QFrame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.active = False
@@ -83,8 +83,6 @@ class PatchworkView(QFrame):
         self.setLineWidth(2)
         self.setMidLineWidth(1)
 
-    #TODO: Actions
-    
     def fitToHeight(self):
         self.scale = self.height() / (self.patchwork.maph * self.patchwork.tileh)
 
@@ -95,18 +93,10 @@ class PatchworkView(QFrame):
         h = self.height() / (self.patchwork.maph * self.patchwork.tileh)
         w = self.width() / (self.patchwork.mapw * self.patchwork.tilew)
         self.scale = min(h, w)
-        
 
-    def resize(self, *args, **kwargs):
-        super().resize(*args, **kwargs)
-
-    def open(self, patchwork: Patchwork):
+    def open(self, image: QImage):
         self.active = True
-        self.patchwork = patchwork
-        self.image = QPixmap(patchwork.pixel_width(),
-                        patchwork.pixel_height())
-        patchwork.draw(QPainter(self.image))
-        self.image = self.image.toImage()
+        self.image = image
         self._imw = self.image.width()
         self._imh = self.image.height()
         self.fit()
@@ -141,6 +131,30 @@ class PatchworkView(QFrame):
     def wheelEvent(self, event: QWheelEvent):
         mod = (2 ** (event.angleDelta().y() // 120) - 1) / 6          
         self.scale *= mod + 1            
+        self.repaint()
+
+    def contextMenuEvent(self, event):
+        def _copy():
+            QApplication.clipboard().setImage(self.image)
+        menu = QMenu(self)
+        action1 = QAction('Копировать')
+        action1.triggered.connect(_copy)
+        menu.addAction(action1)
+
+        menu.exec(event.globalPos())
+
+        
+class PatchworkView(ImageView):
+    def open(self, patchwork: Patchwork):
+        self.active = True
+        self.patchwork = patchwork
+        self.image = QPixmap(patchwork.pixel_width(),
+                        patchwork.pixel_height())
+        patchwork.draw(QPainter(self.image))
+        self.image = self.image.toImage()
+        self._imw = self.image.width()
+        self._imh = self.image.height()
+        self.fit()
         self.repaint()
 
     def contextMenuEvent(self, event):
