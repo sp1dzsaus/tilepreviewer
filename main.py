@@ -1,6 +1,6 @@
-from PyQt5.QtGui import QPainter, QColor, QFont, QPixmap, QMouseEvent, QWheelEvent, QImage, QIcon, QClipboard
+from PyQt5.QtGui import QPainter, QColor, QFont, QPixmap, QMouseEvent, QWheelEvent, QImage, QIcon, QClipboard, QPen
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt, QRectF, QPoint, QPointF, QSize
+from PyQt5.QtCore import Qt, QRect, QRectF, QPoint, QPointF, QSize
 import sys
 from patchwork import Patchwork, InvalidTileData
 import subprocess
@@ -84,14 +84,14 @@ class ImageView(QFrame):
         self.setMidLineWidth(1)
 
     def fitToHeight(self):
-        self.scale = self.height() / (self.patchwork.maph * self.patchwork.tileh)
+        self.scale = self.height() / self._imh
 
     def fitToWidth(self):
-        self.scale = self.width() / (self.patchwork.mapw * self.patchwork.tilew)
+        self.scale = self.width() / self._imw
 
     def fit(self):
-        h = self.height() / (self.patchwork.maph * self.patchwork.tileh)
-        w = self.width() / (self.patchwork.mapw * self.patchwork.tilew)
+        h = self.height() / self._imh
+        w = self.width() / self._imw
         self.scale = min(h, w)
 
     def open(self, image: QImage):
@@ -177,9 +177,62 @@ class PatchworkView(ImageView):
         menu.exec(event.globalPos())
 
 
-class TilemapSlicerDialog(QDialog):
+class TilemapSlicerView(ImageView):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.selection = QRect(0, 0, 0, 0)
+        self._select_point = False
+        self.shift = QPoint(5, 5)
+
+    def x_clamp(self, x):
+        rect = self.get_rect()
+        return min(rect.width() + rect.x(), max(rect.x(), x))
+
+    def y_clamp(self, y):
+        rect = self.get_rect()
+        return min(rect.height() + rect.y(), max(rect.y(), y))
+    
+    def mousePressEvent(self, event: QMouseEvent):
+        self.selection = QRect(0, 0, 0, 0)
+        self._select_point = QPointF(self.x_clamp(round(event.x())) / self.scale,
+                                     self.y_clamp(round(event.y())) / self.scale)
+        self.selection.setX(self._select_point.x())
+        self.selection.setY(self._select_point.y())
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        self._select_point = False
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if self._select_point:
+            pos = QPointF(self.x_clamp(round(event.x())) / self.scale,
+                          self.y_clamp(round(event.y())) / self.scale)
+            delta = (pos - self._select_point)
+            self.selection.setSize(QSize(delta.x(), delta.y()))
+            self.repaint()
+
+    def get_selection_rect(self):
+        return QRectF(self.selection.x() * self.scale,
+                      self.selection.y() * self.scale,
+                      self.selection.width() * self.scale,
+                      self.selection.height() * self.scale)
+
+    def isSelectionSquare(self):
+        return abs(self.selection.width()) == abs(self.selection.height())
+    
+    def paintEvent(self, e):
+        super().paintEvent(e)
+        painter = QPainter(self)
+        try:
+            painter.setPen(QPen(Qt.green if self.isSelectionSquare() else Qt.blue, 
+                                3, Qt.DashDotLine, Qt.RoundCap, Qt.RoundJoin))
+        except Exception as e:
+            print(e)
+        painter.drawRect(self.get_selection_rect())
+
+class TilemapSlicerDialog(QDialog):
+    def __init__(self, image, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.image = image
         self.initUI()
 
     def initUI(self):
@@ -189,6 +242,14 @@ class TilemapSlicerDialog(QDialog):
         geometry.translate(size.width() / 2, size.height() / 2)
         self.setGeometry(geometry)
         self.setWindowTitle('Вырезать текстуру из набора')
+
+        self.slicer = TilemapSlicerView(self)
+        self.slicer.resize(size / 1.25)
+        self.slicer.open(self.image)
+        self.layout = QGridLayout(self)
+        self.layout.addWidget(self.slicer, 0, 0, 3, 3)
+
+
 
 
 class Window(QMainWindow):
@@ -223,7 +284,8 @@ class Window(QMainWindow):
         self.layout.addWidget(self.start_button, 1, 0, 1, 1, Qt.AlignBottom)
         self.setCentralWidget(self.central)
 
-        widget = TilemapSlicerDialog(self)
+        widget = TilemapSlicerDialog(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/nodes/chaotic.bmp'),
+                                     self)
         widget.show()
 
 
