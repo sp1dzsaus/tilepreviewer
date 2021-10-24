@@ -315,9 +315,7 @@ class TilemapSlicerDialog(QDialog):
         for image in self.tilelist.getData():
             self.resulttilelist.addTile(image)
 
-
-
-
+#TODO: Cellar selection mode
 
 class Window(QMainWindow):
     def __init__(self):
