@@ -176,6 +176,21 @@ class PatchworkView(ImageView):
         menu.addAction(action2)
         menu.exec(event.globalPos())
 
+
+class TilemapSlicerDialog(QDialog):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.initUI()
+
+    def initUI(self):
+        geometry = self.parentWidget().geometry()
+        size = geometry.size() / 2
+        geometry.setSize(size)
+        geometry.translate(size.width() / 2, size.height() / 2)
+        self.setGeometry(geometry)
+        self.setWindowTitle('Вырезать текстуру из набора')
+
+
 class Window(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -207,6 +222,9 @@ class Window(QMainWindow):
         self.layout.addWidget(self.tilelist, 0, 0, Qt.AlignLeft)
         self.layout.addWidget(self.start_button, 1, 0, 1, 1, Qt.AlignBottom)
         self.setCentralWidget(self.central)
+
+        widget = TilemapSlicerDialog(self)
+        widget.show()
 
 
     def start(self):
