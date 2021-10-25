@@ -82,8 +82,10 @@ class SlicerProductList(TileList):
     
     def openTileSelection(self):
         if self.slicer.isAnythingSelected():
-            self.addTile(self.slicer.selectedArea())
+            for selection in self.slicer.selectedTiles():
+                self.addTile(selection)
         self.slicer.retireSelection()
+        self.slicer.repaint()
 
 class ImageView(QFrame):
     def __init__(self, *args, **kwargs):
@@ -106,6 +108,9 @@ class ImageView(QFrame):
         h = self.height() / self._imh
         w = self.width() / self._imw
         self.scale = min(h, w)
+
+    def imToCanCoords(self, point):
+        return (point + self.shift) * self.scale
 
     def open(self, image: QImage):
         self.active = True
@@ -286,20 +291,29 @@ class TilesetSlicerView(ImageView):
 class TilesetTableView(ImageView):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.rows = 1
-        self.columns = 1
-        self.tilewidth = self._imw
-        self.tileheight = self._imh
+        self.rows = 14
+        self.columns = 14
+        self.tilewidth = 0
+        self.tileheight = 0
         self.shift = QPoint(5, 5)
         self.selected = set()
+
+    def retireSelection(self):
+        self.selected.clear()
+
+    def open(self, *args, **kwargs):
+        super().open(*args, **kwargs)
+        self.tilewidth = self._imw // self.columns
+        self.tileheight = self._imh // self.rows
     
     def mousePressEvent(self, event: QMouseEvent):
         if bool(event.modifiers() & Qt.ShiftModifier):
             super().mousePressEvent(event)
             return
         pos = event.pos() / self.scale - self.shift
-        self.selected.append(pos // QPoint(self.tilewidth,
-                                           self.tileheight))
+        self.selected.add((pos.x() // self.tilewidth,
+                           pos.y() // self.tileheight))
+        self.repaint()
 
 
     def mouseReleaseEvent(self, event: QMouseEvent):
@@ -318,8 +332,9 @@ class TilesetTableView(ImageView):
     def selectedTiles(self):
         out = []
         for selection in self.selected:
-            rect = QRect(selection.x() * self.tilewidth,
-                         selection.y() * self.tileheight,
+            x, y = selection
+            rect = QRect(x * self.tilewidth,
+                         y * self.tileheight,
                          self.tilewidth,
                          self.tileheight)
             cropped = self.image.copy(rect)
@@ -330,11 +345,28 @@ class TilesetTableView(ImageView):
     def paintEvent(self, e):
         super().paintEvent(e)
         painter = QPainter(self)
-        painter.setPen(QPen(Qt.green if self.isSelectionSquare() else Qt.blue,
-                            3, Qt.DashDotLine, Qt.RoundCap, Qt.RoundJoin))
-        for area in self.gray_areas:
-            painter.fillRect(self.convertRect(area), QColor(150, 150, 150, 150))
-        painter.drawRect(self.get_selection_rect())
+        pen = QPen(Qt.white, 3, Qt.SolidLine, Qt.SquareCap, Qt.RoundJoin)
+        painter.setPen(pen)
+        p = self.imToCanCoords
+        for row in range(self.rows):
+            painter.drawLine(p(QPoint(0, row * self.tileheight)),
+                             p(QPoint(self._imw, row * self.tileheight)))
+        for column in range(self.columns):
+            painter.drawLine(p(QPoint(column * self.tilewidth, 0)),
+                             p(QPoint(column * self.tilewidth, self._imh)))
+        pen = QPen(Qt.black, 3, Qt.DashLine, Qt.SquareCap, Qt.RoundJoin)
+        painter.setPen(pen)
+        for selection in self.selected:
+            x, y = selection
+            painter.fillRect(QRect(p(QPoint(x * self.tilewidth,
+                                            y * self.tileheight)),
+                                   QSize(self.tilewidth * self.scale,
+                                         self.tileheight * self.scale)),
+                             QColor(190, 200, 255, 70))
+            painter.drawRect(QRect(p(QPoint(x * self.tilewidth,
+                                            y * self.tileheight)),
+                                   QSize(self.tilewidth * self.scale,
+                                         self.tileheight * self.scale)))            
 
 class TilesetSlicerDialog(QDialog):
     def __init__(self, image, tilelist, *args, **kwargs):
@@ -352,17 +384,17 @@ class TilesetSlicerDialog(QDialog):
         self.setGeometry(geometry)
         self.setWindowTitle('Вырезать текстуру из набора')
 
-        self.slicer = TilesetSlicerView(self)
-        self.slicer.resize(size / 1.25)
-        self.slicer.open(self.image)
+        self.tileset = TilesetTableView(self)
+        self.tileset.resize(size / 1.25)
+        self.tileset.open(self.image)
         
-        self.tilelist = SlicerProductList(self.slicer, self)
+        self.tilelist = SlicerProductList(self.tileset, self)
 
         self.finish_button = QPushButton('Готово', self)
         self.finish_button.clicked.connect(self.close)
         
         self.layout = QGridLayout(self)
-        self.layout.addWidget(self.slicer, 0, 0, 3, 3)
+        self.layout.addWidget(self.tileset, 0, 0, 3, 3)
         self.layout.addWidget(self.tilelist, 0, 4, Qt.AlignLeft)
         self.layout.addWidget(self.finish_button, 1, 4, Qt.AlignLeft)
 
@@ -370,24 +402,15 @@ class TilesetSlicerDialog(QDialog):
         for image in self.tilelist.getData():
             self.resulttilelist.addTile(image)
 
-#TODO: Cellar selection mode
-
 class Window(QMainWindow):
     def __init__(self):
         super().__init__()
         self.initUI()
-       # self.demo()
-
-    def demo(self):
-        self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt/dirt1.png'))
-        self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt/dirt2.png'))
-        self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt/dirt3.png'))
-        self.start()
 
     def initUI(self):
         self.setGeometry(100, 100, 1510, 1000)
         self.setWindowTitle('TilePreviewer')
-        
+
         self.central = QWidget(self)
 
         self.tilelist = TileList(self.central)
