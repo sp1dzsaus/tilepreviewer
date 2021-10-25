@@ -432,7 +432,7 @@ class Window(QMainWindow):
             error.open()
         except NotImplementedError as ex:
             error = QMessageBox(self)
-            error.setText('Эта функция не доступна в данной версии приложения.')
+            error.setText('Количество тайлов не должно превышать четырёх.')
             error.setWindowTitle('Ошибка')
             error.open()
 
