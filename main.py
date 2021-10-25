@@ -201,11 +201,38 @@ class PatchworkView(ImageView):
         menu.addAction(action2)
         menu.exec(event.globalPos())
 
+def natural(n):
+    n = int(n)
+    if n < 1:
+        raise ValueError('Natural numbers must be greater than zero.')
+    return n
+
+class LineEditPlus(QWidget):
+    def __init__(self, type, labeltext, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = type
+        self.label = labeltext
+        self.label = QLabel(labeltext, self)
+        self.input = QLineEdit(self)
+        self.layout = QHBoxLayout(self)
+        self.layout.addWidget(self.label)
+        self.layout.addWidget(self.input)
+        self.input.editingFinished.connect(self.checkInput)
+
+    def checkInput(self):
+        try:
+            self.type(self.input.text())
+        except ValueError:
+            self.input.setText('')
+
+    def getInput(self):
+        return self.type(self.input.text())
+
 class TilesetSelector(ImageView):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.rows = 14
-        self.columns = 14
+        self.rows = 1
+        self.columns = 1
         self.tilewidth = 0
         self.tileheight = 0
         self.shift = QPoint(5, 5)
@@ -315,11 +342,53 @@ class TilesetDialog(QDialog):
 
         self.finish_button = QPushButton('Готово', self)
         self.finish_button.clicked.connect(self.close)
-        
+
+        self.rowsLabel = LineEditPlus(natural, 'Кол-во строк:     ', self)
+        self.columnsLabel = LineEditPlus(natural, 'Кол-во столбцов:', self)
+        self.tilewidthLabel = LineEditPlus(natural, 'Ширина тайла:', self)
+        self.tileheightLabel = LineEditPlus(natural, 'Высота тайла:', self)
+        self.rowsLabel.input.setText(str(1))
+        self.columnsLabel.input.setText(str(1))
+        self.tilewidthLabel.input.setText(str(self.tileset._imw))
+        self.tileheightLabel.input.setText(str(self.tileset._imh))
+        self.rowsLabel.input.editingFinished.connect(self.setRowsLabel)
+        self.columnsLabel.input.editingFinished.connect(self.setColumnsLabel)
+        self.tilewidthLabel.input.editingFinished.connect(self.setTileWidthLabel)
+        self.tileheightLabel.input.editingFinished.connect(self.setTileHeightLabel)
+
+
         self.layout = QGridLayout(self)
-        self.layout.addWidget(self.tileset, 0, 0, 3, 3)
-        self.layout.addWidget(self.tilelist, 0, 4, Qt.AlignLeft)
-        self.layout.addWidget(self.finish_button, 1, 4, Qt.AlignLeft)
+        self.layout.addWidget(self.rowsLabel, 0, 0)
+        self.layout.addWidget(self.columnsLabel, 1, 0)
+        self.layout.addWidget(self.tilewidthLabel, 0, 1)
+        self.layout.addWidget(self.tileheightLabel, 1, 1)
+        self.layout.addWidget(self.tileset, 2, 0, 3, 3)
+        self.layout.addWidget(self.tilelist, 2, 4, Qt.AlignLeft)
+        self.layout.addWidget(self.finish_button, 3, 4, Qt.AlignLeft)
+
+    def setRowsLabel(self):
+        self.tileset.rows = self.rowsLabel.getInput()
+        self.tileset.tilewidth = self.tileset._imh // self.tileset.rows
+        self.tilewidthLabel.input.setText(str(self.tileset.tilewidth))
+        self.tileset.repaint()
+
+    def setColumnsLabel(self):
+        self.tileset.columns = self.columnsLabel.getInput()
+        self.tileset.tileheight = self.tileset._imw // self.tileset.columns
+        self.tileheightLabel.input.setText(str(self.tileset.tileheight))
+        self.tileset.repaint()
+
+    def setTileWidthLabel(self):
+        self.tileset.tilewidth = self.tilewidthLabel.getInput()
+        self.tileset.columns = self.tileset._imw // self.tileset.tilewidth
+        self.columnsLabel.input.setText(str(self.tileset.columns))
+        self.tileset.repaint()
+
+    def setTileHeightLabel(self):
+        self.tileset.tileheight = self.tileheightLabel.getInput()
+        self.tileset.rows = self.tileset._imh // self.tileset.tileheight
+        self.rowsLabel.input.setText(str(self.tileset.rows))
+        self.tileset.repaint()
 
     def finish(self):
         for image in self.tilelist.getData():
