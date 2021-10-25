@@ -55,7 +55,7 @@ class TileList(QWidget):
         fname = QFileDialog.getOpenFileName(self, 'Выбрать текстуру', '',
                                             'Изображение (*.png *.jpg *.bmp)')[0]
         if fname:
-            widget = TilesetSlicerDialog(open_image(fname),
+            widget = TilesetDialog(open_image(fname),
                                          self,
                                          self.window())
             widget.show()
@@ -75,7 +75,7 @@ class TileList(QWidget):
         return [self.listwidget.item(x).__data
                 for x in range(self.listwidget.count())]
 
-class SlicerProductList(TileList):
+class TilesetOutputList(TileList):
     def __init__(self, slicer, *args, **kwargs):
         self.slicer = slicer
         super().__init__(*args, **kwargs)
@@ -201,94 +201,7 @@ class PatchworkView(ImageView):
         menu.addAction(action2)
         menu.exec(event.globalPos())
 
-
-class TilesetSlicerView(ImageView):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.selection = QRect(0, 0, 0, 0)
-        self._select_point = False
-        self.shift = QPoint(5, 5)
-        self.gray_areas = []
-
-    def retireSelection(self):
-        self.gray_areas.append(self.selection)
-        self.selection = QRect(0, 0, 0, 0)
-        self.repaint()
-
-    def x_clamp(self, x):
-        rect = self.get_rect()
-        return min(rect.width() + rect.x(), max(rect.x(), x))
-
-    def y_clamp(self, y):
-        rect = self.get_rect()
-        return min(rect.height() + rect.y(), max(rect.y(), y))
-    
-    def mousePressEvent(self, event: QMouseEvent):
-        if bool(event.modifiers() & Qt.ShiftModifier):
-            super().mousePressEvent(event)
-            return
-        self.selection = QRect(0, 0, 0, 0)
-        pos = event.pos()
-        self._select_point = QPointF(self.x_clamp(int(pos.x())) / self.scale - self.shift.x(),
-                                     self.y_clamp(int(pos.y())) / self.scale - self.shift.y())
-        self.selection.setX(self._select_point.x())
-        self.selection.setY(self._select_point.y())
-
-    def mouseReleaseEvent(self, event: QMouseEvent):
-        if bool(event.modifiers() & Qt.ShiftModifier):
-            super().mouseReleaseEvent(event)
-            return
-        self._select_point = False
-
-    def mouseMoveEvent(self, event: QMouseEvent):
-        if bool(event.modifiers() & Qt.ShiftModifier):
-            super().mouseMoveEvent(event)
-            return        
-        if self._select_point:
-            pos = event.pos()
-            pos.setX(pos.x() + self.scale)
-            pos.setY(pos.y() + self.scale)
-            pos = QPointF(self.x_clamp(ceil(pos.x())) / self.scale - self.shift.x(),
-                          self.y_clamp(ceil(pos.y())) / self.scale - self.shift.y())
-            delta = (pos - self._select_point)
-            self.selection.setSize(QSize(delta.x(), delta.y()))
-            self.repaint()
-
-    def get_selection_rect(self):
-        return self.convertRect(self.selection)
-
-    def isSelectionSquare(self):
-        return abs(self.selection.width()) == abs(self.selection.height())
-
-    def isAnythingSelected(self):
-        return self.selection.width() != 0 and self.selection.height() != 0
-
-    def selectedArea(self):
-        rect = QRect(self.selection.x(),
-                     self.selection.y(),
-                     self.selection.width(),
-                     self.selection.height())
-        if rect.width() < 0:
-            rect.translate(rect.width(), 0)
-            rect.setWidth(abs(rect.width()))
-        if rect.height() < 0:
-            rect.translate(0, rect.height())
-            rect.setHeight(abs(rect.height()))
-        cropped = self.image.copy(rect)
-        cropped._path = self.image._path
-        return cropped
-    
-    def paintEvent(self, e):
-        super().paintEvent(e)
-        painter = QPainter(self)
-        painter.setPen(QPen(Qt.green if self.isSelectionSquare() else Qt.blue,
-                            3, Qt.DashDotLine, Qt.RoundCap, Qt.RoundJoin))
-        for area in self.gray_areas:
-            painter.fillRect(self.convertRect(area), QColor(150, 150, 150, 150))
-        painter.drawRect(self.get_selection_rect())
-
-
-class TilesetTableView(ImageView):
+class TilesetSelector(ImageView):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.rows = 14
@@ -368,7 +281,7 @@ class TilesetTableView(ImageView):
                                    QSize(self.tilewidth * self.scale,
                                          self.tileheight * self.scale)))            
 
-class TilesetSlicerDialog(QDialog):
+class TilesetDialog(QDialog):
     def __init__(self, image, tilelist, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.image = image
@@ -384,11 +297,11 @@ class TilesetSlicerDialog(QDialog):
         self.setGeometry(geometry)
         self.setWindowTitle('Вырезать текстуру из набора')
 
-        self.tileset = TilesetTableView(self)
+        self.tileset = TilesetSelector(self)
         self.tileset.resize(size / 1.25)
         self.tileset.open(self.image)
         
-        self.tilelist = SlicerProductList(self.tileset, self)
+        self.tilelist = TilesetOutputList(self.tileset, self)
 
         self.finish_button = QPushButton('Готово', self)
         self.finish_button.clicked.connect(self.close)
