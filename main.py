@@ -223,11 +223,11 @@ class TilesetSelector(ImageView):
         if bool(event.modifiers() & Qt.ShiftModifier):
             super().mousePressEvent(event)
             return
-        pos = event.pos() / self.scale - self.shift
-        self.selected.add((pos.x() // self.tilewidth,
-                           pos.y() // self.tileheight))
-        self.repaint()
-
+        if self.get_rect().contains(event.pos()):
+            pos = event.pos() / self.scale - self.shift
+            self.selected.add((pos.x() // self.tilewidth,
+                               pos.y() // self.tileheight))
+            self.repaint()
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         if bool(event.modifiers() & Qt.ShiftModifier):
@@ -261,10 +261,10 @@ class TilesetSelector(ImageView):
         pen = QPen(Qt.white, 3, Qt.SolidLine, Qt.SquareCap, Qt.RoundJoin)
         painter.setPen(pen)
         p = self.imToCanCoords
-        for row in range(self.rows):
+        for row in range(self.rows + 1):
             painter.drawLine(p(QPoint(0, row * self.tileheight)),
                              p(QPoint(self._imw, row * self.tileheight)))
-        for column in range(self.columns):
+        for column in range(self.columns + 1):
             painter.drawLine(p(QPoint(column * self.tilewidth, 0)),
                              p(QPoint(column * self.tilewidth, self._imh)))
         pen = QPen(Qt.black, 3, Qt.DashLine, Qt.SquareCap, Qt.RoundJoin)
