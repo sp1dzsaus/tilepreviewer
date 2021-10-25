@@ -282,6 +282,60 @@ class TilesetSlicerView(ImageView):
             painter.fillRect(self.convertRect(area), QColor(150, 150, 150, 150))
         painter.drawRect(self.get_selection_rect())
 
+
+class TilesetTableView(ImageView):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.rows = 1
+        self.columns = 1
+        self.tilewidth = self._imw
+        self.tileheight = self._imh
+        self.shift = QPoint(5, 5)
+        self.selected = set()
+    
+    def mousePressEvent(self, event: QMouseEvent):
+        if bool(event.modifiers() & Qt.ShiftModifier):
+            super().mousePressEvent(event)
+            return
+        pos = event.pos() / self.scale - self.shift
+        self.selected.append(pos // QPoint(self.tilewidth,
+                                           self.tileheight))
+
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        if bool(event.modifiers() & Qt.ShiftModifier):
+            super().mouseReleaseEvent(event)
+            return
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if bool(event.modifiers() & Qt.ShiftModifier):
+            super().mouseMoveEvent(event)
+            return
+
+    def isAnythingSelected(self):
+        return bool(self.selected)
+
+    def selectedTiles(self):
+        out = []
+        for selection in self.selected:
+            rect = QRect(selection.x() * self.tilewidth,
+                         selection.y() * self.tileheight,
+                         self.tilewidth,
+                         self.tileheight)
+            cropped = self.image.copy(rect)
+            cropped._path = self.image._path
+            out.append(cropped)
+        return out
+    
+    def paintEvent(self, e):
+        super().paintEvent(e)
+        painter = QPainter(self)
+        painter.setPen(QPen(Qt.green if self.isSelectionSquare() else Qt.blue,
+                            3, Qt.DashDotLine, Qt.RoundCap, Qt.RoundJoin))
+        for area in self.gray_areas:
+            painter.fillRect(self.convertRect(area), QColor(150, 150, 150, 150))
+        painter.drawRect(self.get_selection_rect())
+
 class TilesetSlicerDialog(QDialog):
     def __init__(self, image, tilelist, *args, **kwargs):
         super().__init__(*args, **kwargs)
