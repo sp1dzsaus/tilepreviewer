@@ -55,7 +55,7 @@ class TileList(QWidget):
         fname = QFileDialog.getOpenFileName(self, 'Выбрать текстуру', '',
                                             'Изображение (*.png *.jpg *.bmp)')[0]
         if fname:
-            widget = TilemapSlicerDialog(open_image(fname),
+            widget = TilesetSlicerDialog(open_image(fname),
                                          self,
                                          self.window())
             widget.show()
@@ -165,6 +165,7 @@ class ImageView(QFrame):
         
 class PatchworkView(ImageView):
     def open(self, patchwork: Patchwork):
+        
         self.active = True
         self.patchwork = patchwork
         self.image = QPixmap(patchwork.pixel_width(),
@@ -196,7 +197,7 @@ class PatchworkView(ImageView):
         menu.exec(event.globalPos())
 
 
-class TilemapSlicerView(ImageView):
+class TilesetSlicerView(ImageView):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.selection = QRect(0, 0, 0, 0)
@@ -281,7 +282,7 @@ class TilemapSlicerView(ImageView):
             painter.fillRect(self.convertRect(area), QColor(150, 150, 150, 150))
         painter.drawRect(self.get_selection_rect())
 
-class TilemapSlicerDialog(QDialog):
+class TilesetSlicerDialog(QDialog):
     def __init__(self, image, tilelist, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.image = image
@@ -297,7 +298,7 @@ class TilemapSlicerDialog(QDialog):
         self.setGeometry(geometry)
         self.setWindowTitle('Вырезать текстуру из набора')
 
-        self.slicer = TilemapSlicerView(self)
+        self.slicer = TilesetSlicerView(self)
         self.slicer.resize(size / 1.25)
         self.slicer.open(self.image)
         
@@ -321,7 +322,7 @@ class Window(QMainWindow):
     def __init__(self):
         super().__init__()
         self.initUI()
-        self.demo()
+       # self.demo()
 
     def demo(self):
         self.tilelist.addTile(open_image('D:/SP1DZMAIN/PROJECTS/TilePreviewer/examples/dirt/dirt1.png'))
