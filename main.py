@@ -220,7 +220,7 @@ class TilesetSelector(ImageView):
         self.tileheight = self._imh // self.rows
     
     def mousePressEvent(self, event: QMouseEvent):
-        if bool(event.modifiers() & Qt.ShiftModifier):
+        if not bool(event.modifiers() & Qt.ShiftModifier):
             super().mousePressEvent(event)
             return
         if self.get_rect().contains(event.pos()):
@@ -230,12 +230,12 @@ class TilesetSelector(ImageView):
             self.repaint()
 
     def mouseReleaseEvent(self, event: QMouseEvent):
-        if bool(event.modifiers() & Qt.ShiftModifier):
+        if not bool(event.modifiers() & Qt.ShiftModifier):
             super().mouseReleaseEvent(event)
             return
 
     def mouseMoveEvent(self, event: QMouseEvent):
-        if bool(event.modifiers() & Qt.ShiftModifier):
+        if not bool(event.modifiers() & Qt.ShiftModifier):
             super().mouseMoveEvent(event)
             return
 
