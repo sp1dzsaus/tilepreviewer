@@ -218,16 +218,26 @@ class TilesetSelector(ImageView):
         super().open(*args, **kwargs)
         self.tilewidth = self._imw // self.columns
         self.tileheight = self._imh // self.rows
+
+    def selectEvent(self, event):
+        if self.get_rect().contains(event.pos()):
+            pos = event.pos() / self.scale - self.shift
+            key = (pos.x() // self.tilewidth,
+                   pos.y() // self.tileheight)
+            if key not in self.selected:
+                self.selected.add(key)
+            else:
+                self.selected.remove(key)
+            self.repaint()        
     
     def mousePressEvent(self, event: QMouseEvent):
         if not bool(event.modifiers() & Qt.ShiftModifier):
             super().mousePressEvent(event)
             return
-        if self.get_rect().contains(event.pos()):
-            pos = event.pos() / self.scale - self.shift
-            self.selected.add((pos.x() // self.tilewidth,
-                               pos.y() // self.tileheight))
-            self.repaint()
+        self.selectEvent(event)
+
+    def mouseDoubleClickEvent(self, event: QMouseEvent):
+        self.selectEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         if not bool(event.modifiers() & Qt.ShiftModifier):
@@ -295,7 +305,7 @@ class TilesetDialog(QDialog):
         geometry.setSize(size)
         geometry.translate(size.width() / 2, size.height() / 2)
         self.setGeometry(geometry)
-        self.setWindowTitle('Вырезать текстуру из набора')
+        self.setWindowTitle('Выберете текстуру из набора')
 
         self.tileset = TilesetSelector(self)
         self.tileset.resize(size / 1.25)
